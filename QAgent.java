@@ -173,7 +173,7 @@ public class QAgent extends Agent
 		 * TODO: create your model!
 		 */
 		
-		int feature_dim = 2; 
+		int feature_dim = 3; 
 		int hidden_dim1 = 2;
 		int hidden_dim2 = 2; 
 		
@@ -258,10 +258,6 @@ public class QAgent extends Agent
             	  ActionFeedback feedback = result.getFeedback();
             	  if (feedback == ActionFeedback.COMPLETED) {
             		  
-            		  
-            		  
-            		  
-            		  
             	  }
               };
               
@@ -324,7 +320,6 @@ public class QAgent extends Agent
     	
     	double normalizedHealth = tgtUnit.getHP()/100;
     	return normalizedHealth;
-    	
     }
     
     private double gangUpFactor(int tgtUnitId, int atkUnitId, StateView state, HistoryView history) {
@@ -332,20 +327,19 @@ public class QAgent extends Agent
     	int turnNumber = state.getTurnNumber();
     	int previousTurnNumber = turnNumber - 1;
     	
-    	 Map<Integer, Action> commandsIssued = history.getCommandsIssued(this.getPlayerNumber(), previousTurnNumber);
-       for (Map.Entry<Integer, Action> commandEntry : commandsIssued.entrySet()) {
-    	   System.out.println(commandEntry);
-    	   System.out.println(atkUnitId);
-    	   if (commandEntry.getKey() == atkUnitId) {
-    		   System.out.println(atkUnitId);
-    		   System.out.println(commandEntry.getValue().getUnitId());
-    	   }
-//      	 if (commandEntry.getValue() == atkUnitId) {
-//      		 
-//      	 }
-        }
-  	
-    	return 0.0;
+    	int amtAttackers = 0;
+    	
+    	for(DamageLog damageLog : history.getDamageLogs(previousTurnNumber)) {
+    		
+    		int defender = damageLog.getDefenderID();
+    		
+    		if (defender == tgtUnitId) {
+    			amtAttackers += 1;
+    		}
+    	     
+    	}
+ 
+    	return amtAttackers/5;
     }
     
    private Matrix calculateFeatureVector(StateView state, HistoryView history,
@@ -356,15 +350,15 @@ public class QAgent extends Agent
 	   Unit.UnitView tgtUnit = state.getUnit(tgtUnitId);
    	   Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 	   
-	   Matrix features = Matrix.zeros(1, 2);
+	   Matrix features = Matrix.zeros(1, 3);
 	   
 	   gangUpFactor(tgtUnitId, atkUnitId, state, history);
 	   
 	   features.set(0, 0, getHealthDiff(tgtUnit, atkUnit, state));
 	   features.set(0, 1, getEnemyHealth(tgtUnit));
-//	   features.set(0, 2, gangUpFactor(tgtUnitId, atkUnitId, state, history));
+	   features.set(0, 2, gangUpFactor(tgtUnitId, atkUnitId, state, history));
 	   
-//	   System.out.println(features);
+
 	   return features;
    }
    
