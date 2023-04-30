@@ -239,44 +239,23 @@ public class QAgent extends Agent
     private double getRewardForUnit(StateView state, HistoryView history, int unitId)
     {
     	/** TODO: complete me! **/
-    	
-    	int turnNumber = state.getTurnNumber();
-    	
-    	if (turnNumber == 0){
-    		return 0.0;
+    	int lastTurnNumber = state.getTurnNumber()-1;
+    	int damageTaken = 0;
+    	int damageDealt = 0;
+    	// check if footman took damage
+    	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
+//    		System.out.println("Defending player: " + damageLog.getDefenderController() + " defending unit: " + 
+//    	    damageLog.getDefenderID() + " attacking player: " + damageLog.getAttackerController() + 
+//    	    "attacking unit: " + damageLog.getAttackerID() + "damage done: "+damageLog.getDamage());
+    		if (damageLog.getDefenderController() == 0 && damageLog.getDefenderID() == unitId) {
+    			damageTaken -= damageLog.getDamage();
+    		}
+    		if (damageLog.getAttackerController() == 0 && damageLog.getAttackerID() == unitId) {
+    			damageDealt += damageLog.getDamage();
+    		}
     	}
-    	
-    	int ourPlayer = this.getPlayerNumber();
-    	Unit.UnitView unit = state.getUnit(unitId);
-    	int previousTurnNumber = turnNumber - 1;
-    	
-    	  Map<Integer, ActionResult> actionResults = history.getCommandFeedback(ourPlayer, previousTurnNumber);
-          for(ActionResult result : actionResults.values()) {
-              
-              Action action = result.getAction();
-              if (action.getUnitId() == unitId) {
-            	  ActionFeedback feedback = result.getFeedback();
-            	  if (feedback == ActionFeedback.COMPLETED) {
-            		  
-            	  }
-              };
-              
-          }
-    	
-//    	 for(DamageLog damageLog : history.getDamageLogs(previousTurnNumber)) {
-//    	         System.out.println("Defending player: " + damageLog.getDefenderController() + " defending unit: " + 
-//    	              damageLog.getDefenderID() + " attacking player: " + damageLog.getAttackerController() + 
-//    	              "attacking unit: " + damageLog.getAttackerID());
-//    	      }
-//    	
-//    	 Map<Integer, Action> commandsIssued = history.getCommandsIssued(ourPlayer, previousTurnNumber);
-//         for (Map.Entry<Integer, Action> commandEntry : commandsIssued.entrySet()) {
-//        	 if (commandEntry.getKey() == unitId) {
-//        		 
-//        	 }
-//          }
-    	
-        return 0.0;
+    	int reward = damageTaken+damageDealt;
+    	return reward;
     }
 
     /**
