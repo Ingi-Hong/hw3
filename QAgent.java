@@ -304,12 +304,13 @@ public class QAgent extends Agent
     //Hopefully nn agrees. 
     private double getHealthDiff(Unit.UnitView tgtUnit, Unit.UnitView atkUnit, StateView state) {
     	
-    	int tgtUnitHealth = tgtUnit.getHP();
-    	int atkUnitHealth = atkUnit.getHP();
+    	double tgtUnitHealth = tgtUnit.getHP();
+    	double atkUnitHealth = atkUnit.getHP();
     	
     	double difference = atkUnitHealth - tgtUnitHealth;
     	
-    	double normalizedDiff = difference/100;
+    	
+    	double normalizedDiff = difference/100D;
     	
     	return normalizedDiff;	
     }
@@ -318,28 +319,36 @@ public class QAgent extends Agent
     //Chose it because hopefully the nn starts to target lower health units (finish them off faster so they have no damage potential).
     private double getEnemyHealth(Unit.UnitView tgtUnit) {
     	
-    	double normalizedHealth = tgtUnit.getHP()/100;
+    	
+    	double normalizedHealth = tgtUnit.getHP()/100D;
     	return normalizedHealth;
     }
     
+    //More people attacking one enemy kills the enemy quicker. Good info for the nn to have. 
     private double gangUpFactor(int tgtUnitId, int atkUnitId, StateView state, HistoryView history) {
     	
-    	int turnNumber = state.getTurnNumber();
-    	int previousTurnNumber = turnNumber - 1;
+    	  Map<Integer, Action> actions = history.getCommandsIssued(this.getPlayerNumber(), state.getTurnNumber() - 1);
+    	  
+    	  double amtAttackers = 0.0;
+          for(Action action : actions.values()) {
+              TargetedAction targetAction = (TargetedAction) action;
+              if (targetAction.getTargetId() == tgtUnitId) {
+            	  
+            	amtAttackers++;  
+              }
+         }
+          
+          Map<Integer, ActionResult> feedback = history.getCommandFeedback(this.getPlayerNumber(), state.getTurnNumber() - 1);
+          
+          for(ActionResult actionResult : feedback.values()) {
+        	  TargetedAction targetAction = (TargetedAction) actionResult.getAction();
+              if (targetAction.getTargetId() == tgtUnitId) {
+            	amtAttackers++;  
+              }
+         }
+          
+          return amtAttackers/5;
     	
-    	int amtAttackers = 0;
-    	
-    	for(DamageLog damageLog : history.getDamageLogs(previousTurnNumber)) {
-    		
-    		int defender = damageLog.getDefenderID();
-    		
-    		if (defender == tgtUnitId) {
-    			amtAttackers += 1;
-    		}
-    	     
-    	}
- 
-    	return amtAttackers/5;
     }
     
    private Matrix calculateFeatureVector(StateView state, HistoryView history,
@@ -351,14 +360,12 @@ public class QAgent extends Agent
    	   Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 	   
 	   Matrix features = Matrix.zeros(1, 3);
-	   
-	   gangUpFactor(tgtUnitId, atkUnitId, state, history);
-	   
+	   	   
 	   features.set(0, 0, getHealthDiff(tgtUnit, atkUnit, state));
 	   features.set(0, 1, getEnemyHealth(tgtUnit));
 	   features.set(0, 2, gangUpFactor(tgtUnitId, atkUnitId, state, history));
 	   
-
+	   System.out.println(features);
 	   return features;
    }
    
