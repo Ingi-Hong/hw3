@@ -199,18 +199,28 @@ public class QAgent extends Agent {
 		 * TODO: create your model!
 		 */
 
-		int feature_dim = 7;
+		int feature_dim = 9;
 		int hidden_dim1 = 6;
-//		int hidden_dim2 = 3; 
+		int hidden_dim2 = 3; 
+		int hidden_dim3 = 2; 
 
-		m.add(new Dense(feature_dim, 3, this.getRandom()));
+		m.add(new Dense(feature_dim, hidden_dim1, this.getRandom()));
+		m.add(new ReLU());
+
+		m.add(new Dense(hidden_dim1, hidden_dim2, this.getRandom()));
 		m.add(new ReLU());
 		
-		m.add(new Dense(3, 2, this.getRandom()));
+		m.add(new Dense(hidden_dim2, hidden_dim3, this.getRandom()));
 		m.add(new ReLU());
-
+		
+		m.add(new Dense(hidden_dim3, hidden_dim3, this.getRandom()));
+		m.add(new ReLU());
+		
+		m.add(new Dense(hidden_dim3, hidden_dim3, this.getRandom()));
+		m.add(new ReLU());
+		
 		// the last layer MUST be a scalar though
-		m.add(new Dense(2, 1));
+		m.add(new Dense(hidden_dim3, 1));
 		m.add(new Identity());
 
 //		m.add(ReLU()); // decide if you want to add an activation
@@ -277,18 +287,18 @@ public class QAgent extends Agent {
 			}
 			switch (result.getFeedback()) {
 			case COMPLETED:
-				reward = reward + 0.00000000005;
+
 				TargetedAction action = (TargetedAction) result.getAction();
 				// reward for killing an enemy
 				if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
 //        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
-					reward = reward + 5;
+					reward = reward + 85000;
 				}
 			case INCOMPLETE:
 				continue;
 
 			default:
-				reward = reward - 0.00000000001;
+				continue;
 			}
 		}
 
@@ -319,75 +329,127 @@ public class QAgent extends Agent {
 			}
 		}
 
-		if (tgtUnit == -100) {
+		if (tgtUnit == -100D) {
 			return 0.0;
 		}
 
 		int amtAttacking = attackMap.get(tgtUnit);
 		double totalLeft = (double) this.getMyUnitIds().size();
-		
-		if (totalLeft == 1) {
-			return -0.00001;
+		if (totalLeft == 1D) {
+			return 0.0;
 		}
-		
-		double ratio = amtAttacking/totalLeft;
-		
-		if (totalLeft == 2 && amtAttacking == 2) {
-			return 0.5;
-		}
-		
-		if (ratio <= 1.0/totalLeft) {
-			return -100;
-		}
-		
-		if (ratio <= 2.0/totalLeft) {
-			return -50;
-		}
-		
-		if(ratio<=3.0/totalLeft) {
-			return -15; 
-		}
-		
-		if(ratio<=4.0/totalLeft) {
-			return -1;
-		}
-		
-		if(ratio<=5.0/totalLeft) {
-			return 0.5;
-		}
-		return -5;
-	}
-	
-	private double getRewardForGrouping(StateView state, int unitId) {
-		
-		double distance = selfNearFriends(state, state.getUnit(unitId));
-		
-		if(distance==0) {
-			return 0;
-		}
-		
-		if (distance >= 6) {
-			return -4;
-		}
-		
-		if (distance >= 5) {
-			return -2;
-		}
-		
-		if (distance >= 4) {
-			return -1;
-		}
-		
-		if (distance >= 3) {
-			return 0;
-		}
-		
-		if (distance >= 2) {
+		double ratio = amtAttacking / totalLeft;
+		if (totalLeft == 2D && amtAttacking == 2D) {
 			return 0.1;
 		}
-		
-		else {
+		if (totalLeft == 3D) {
+			if (ratio < 2/3D) {
+				return -(ratio);
+			}
+			else {
+				return ratio;
+			}
+		}
+
+		if (totalLeft == 4D) {
+
+			if (ratio < 3/4D) {
+				return -(3/4D);
+			}
+			if (ratio == 3/4D) {
+				return -(1/2);
+			} else {
+				return 2;
+			}
+
+		}
+
+		if (totalLeft == 5) {
+
+			if (ratio <= 1.0 / 5D) {
+				return -3.0;
+			}
+
+			if (ratio <= 2.0 / 5D) {
+				return -2.0;
+			}
+
+			if (ratio <= 3.0 / 5D) {
+				return -1.0;
+			}
+
+			if (ratio <= 4.0 / 5D) {
+				return 0.0;
+			}
+
+			if (ratio <= 5.0 / 5D) {
+				return 4.0;
+			}
+
+		}
+
+		return -5.0;
+	}
+	
+	
+	//doesn't work as intended
+	private double getRewardForGrouping(StateView state, int unitId) {
+
+		double distance = selfNearFriends(state, state.getUnit(unitId));
+		if (distance == 0) {
 			return 0;
+		}
+		
+		return (1/distance*distance);
+	}
+
+	private double getRewardForClosestEnemy(StateView state, Unit.UnitView unit) {
+
+		double x1 = (double) unit.getXPosition();
+		double y1 = (double) unit.getYPosition();
+
+		Set<Integer> mySet = this.getEnemyUnitIds();
+		Iterator<Integer> unitIdsIterator = mySet.iterator();
+
+		double closestDistance = Double.MAX_VALUE;
+		while (unitIdsIterator.hasNext()) {
+			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
+			double x2 = (double) currentUnit.getXPosition();
+			double y2 = (double) currentUnit.getYPosition();
+
+			double yAxisResult = (y2 - y1) * (y2 - y1);
+			double xAxisResult = (x2 - x1) * (x2 - x1);
+			closestDistance = Math.min(closestDistance, Math.sqrt(yAxisResult + xAxisResult));
+		}
+
+//	    	System.out.println((1/closestDistance)*0.1);
+		if (closestDistance > 4.0) {
+			return 0;
+		}
+		if (closestDistance > 1.5) {
+			return 0.1;
+		} else {
+			return 1;
+		}
+
+	}
+
+	private double getRewardForOutnumberingEnemy(StateView state) {
+		double amtEnemies = this.getEnemyUnitIds().size();
+		double mine = this.getMyUnitIds().size();
+		
+		
+		
+		if (mine  > amtEnemies) {
+			return 100;
+		}
+		
+		if (mine == amtEnemies) {
+			return 0;
+		}
+
+		else {
+			return -100;
 		}
 	}
 
@@ -415,15 +477,22 @@ public class QAgent extends Agent {
 			}
 		}
 
-		reward = ((damageDealt*50D)-(damageTaken*50D));
-		
+		double damageRatio = (damageDealt - damageTaken)*500D;
+		reward = reward + damageRatio;
+
 //		System.out.println(reward);
-		
+
 		reward = reward + getRewardForCompletedTasks(state, history, unitId);
-		reward = reward + (getRewardForGangingUp(state, history, unitId));
-		reward = reward + (getRewardForGrouping(state, unitId));
+		reward = reward + (getRewardForGangingUp(state, history, unitId)*1.2);
+//		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
+//		reward = reward + (getRewardForClosestEnemy(state, state.getUnit(unitId))*10); doesn't work as intended
+		reward = reward + getRewardForOutnumberingEnemy(state)*20;
 //	        System.out.println(reward);
-		return reward;
+		
+		if (reward < 0) {
+			return -((reward*reward));
+		}
+		return (reward*reward);
 	}
 
 	/**
@@ -514,58 +583,56 @@ public class QAgent extends Agent {
 //    	System.out.println(distance);
 		return distance / 10D;
 	}
-	
-	
+
 	private double friendsNearTarget(StateView state, Unit.UnitView tgtUnit) {
 		double x1 = (double) tgtUnit.getXPosition();
 		double y1 = (double) tgtUnit.getYPosition();
-		
+
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
+
 		int count = 0;
 		double distance = 0;
-		while(unitIdsIterator.hasNext()) {
+		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
-			
+
 			double yAxisResult = (y2 - y1) * (y2 - y1);
 			double xAxisResult = (x2 - x1) * (x2 - x1);
 			distance = distance + Math.sqrt(yAxisResult + xAxisResult);
 		}
-		
+
 //    	System.out.println(distance);
-		
+
 		return distance / count;
 	}
-	
+
 	private double selfNearFriends(StateView state, Unit.UnitView atkUnit) {
 		double x1 = (double) atkUnit.getXPosition();
 		double y1 = (double) atkUnit.getYPosition();
-		
+
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
+
 		int count = 0;
 		double distance = 0;
-		while(unitIdsIterator.hasNext()) {
+		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
-			
+
 			double yAxisResult = (y2 - y1) * (y2 - y1);
 			double xAxisResult = (x2 - x1) * (x2 - x1);
 			distance = distance + Math.sqrt(yAxisResult + xAxisResult);
 		}
-		
+
 //    	System.out.println(distance);
-		
+
 		return distance / count;
 	}
-	
 
 	private Matrix calculateFeatureVector(StateView state, HistoryView history, int atkUnitId, int tgtUnitId) {
 		/** TODO: complete me! **/
@@ -574,13 +641,15 @@ public class QAgent extends Agent {
 		Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 
 		// Create n + 1 columns for offset, as comment above suggests
-		Matrix features = Matrix.zeros(1, 7);
+		Matrix features = Matrix.zeros(1, 9);
 		features.set(0, 1, getHealthDiff(tgtUnit, atkUnit, state));
 		features.set(0, 2, getEnemyHealth(tgtUnit));
 		features.set(0, 3, gangUpFactor(tgtUnitId, atkUnitId, state, history));
 		features.set(0, 4, distanceToTarget(tgtUnit, atkUnit));
 		features.set(0, 5, friendsNearTarget(state, tgtUnit));
 		features.set(0, 6, selfNearFriends(state, atkUnit));
+		features.set(0, 7, this.getEnemyUnitIds().size()/5);
+		features.set(0, 8, this.getMyUnitIds().size()/5);
 
 //	   System.out.println(features);
 		return features;
@@ -845,7 +914,7 @@ public class QAgent extends Agent {
 		}
 
 		if (actions.size() > 0) {
-			this.getStreamer().streamMove(actions);
+//			this.getStreamer().streamMove(actions); annoying
 		}
 		return actions;
 	}
