@@ -200,8 +200,8 @@ public class QAgent extends Agent {
 		 */
 
 		int feature_dim = 9;
-		int hidden_dim1 = 6;
-		int hidden_dim2 = 3; 
+		int hidden_dim1 = 8;
+		int hidden_dim2 = 4; 
 		int hidden_dim3 = 2; 
 
 		m.add(new Dense(feature_dim, hidden_dim1, this.getRandom()));
@@ -211,12 +211,6 @@ public class QAgent extends Agent {
 		m.add(new ReLU());
 		
 		m.add(new Dense(hidden_dim2, hidden_dim3, this.getRandom()));
-		m.add(new ReLU());
-		
-		m.add(new Dense(hidden_dim3, hidden_dim3, this.getRandom()));
-		m.add(new ReLU());
-		
-		m.add(new Dense(hidden_dim3, hidden_dim3, this.getRandom()));
 		m.add(new ReLU());
 		
 		// the last layer MUST be a scalar though
@@ -350,7 +344,6 @@ public class QAgent extends Agent {
 				return ratio;
 			}
 		}
-
 		if (totalLeft == 4D) {
 
 			if (ratio < 3/4D) {
@@ -437,17 +430,12 @@ public class QAgent extends Agent {
 	private double getRewardForOutnumberingEnemy(StateView state) {
 		double amtEnemies = this.getEnemyUnitIds().size();
 		double mine = this.getMyUnitIds().size();
-		
-		
-		
 		if (mine  > amtEnemies) {
-			return 100;
+			return 1000;
 		}
-		
 		if (mine == amtEnemies) {
 			return 0;
 		}
-
 		else {
 			return -100;
 		}
@@ -477,16 +465,16 @@ public class QAgent extends Agent {
 			}
 		}
 
-		double damageRatio = (damageDealt - damageTaken)*500D;
+		double damageRatio = (damageDealt - damageTaken)*600D;
 		reward = reward + damageRatio;
 
 //		System.out.println(reward);
 
-		reward = reward + getRewardForCompletedTasks(state, history, unitId);
-		reward = reward + (getRewardForGangingUp(state, history, unitId)*1.2);
+		reward = reward + (getRewardForCompletedTasks(state, history, unitId));
+		reward = reward + (getRewardForGangingUp(state, history, unitId));
 //		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
 //		reward = reward + (getRewardForClosestEnemy(state, state.getUnit(unitId))*10); doesn't work as intended
-		reward = reward + getRewardForOutnumberingEnemy(state)*20;
+		reward = reward + getRewardForOutnumberingEnemy(state);
 //	        System.out.println(reward);
 		
 		if (reward < 0) {
