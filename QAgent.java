@@ -1,15 +1,7 @@
-/*
- * Student: Daniel Tse
- * BUID: U05871766
- * Student: Ingi Hong
- * BUID: U35399731
- */
-
 package hw3;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,18 +14,14 @@ import java.util.Random;
 import java.util.Set;
 
 import edu.bu.hw3.linalg.Matrix;
-import edu.bu.hw3.linalg.MatrixTester;
 import edu.bu.hw3.nn.LossFunction;
 import edu.bu.hw3.nn.Model;
 import edu.bu.hw3.nn.Optimizer;
-
-
 import edu.bu.hw3.nn.layers.Dense;
 import edu.bu.hw3.nn.layers.Identity;
 import edu.bu.hw3.nn.layers.ReLU;
 import edu.bu.hw3.nn.layers.Sigmoid;
 import edu.bu.hw3.nn.layers.Tanh;
-
 import edu.bu.hw3.nn.losses.MeanSquaredError;
 import edu.bu.hw3.nn.models.Sequential;
 import edu.bu.hw3.nn.optimizers.SGDOptimizer;
@@ -43,6 +31,7 @@ import edu.bu.hw3.utils.Triple;
 import edu.cwru.sepia.action.Action;
 import edu.cwru.sepia.action.ActionFeedback;
 import edu.cwru.sepia.action.ActionResult;
+import edu.cwru.sepia.action.ActionType;
 import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.agent.Agent;
 import edu.cwru.sepia.environment.model.history.DamageLog;
@@ -53,10 +42,7 @@ import edu.cwru.sepia.environment.model.state.Unit.UnitView;
 import edu.cwru.sepia.environment.model.state.UnitTemplate.UnitTemplateView;
 import edu.cwru.sepia.environment.model.state.State.StateView;
 
-
-
 public class QAgent extends Agent {
-
 	public static final long serialVersionUID = -5077535504876086643L;
 	public static final int RANDOM_SEED = 12345;
 	public static final double GAMMA = 0.9;
@@ -213,20 +199,25 @@ public class QAgent extends Agent {
 		 * TODO: create your model!
 		 */
 
+		int feature_dim = 9;
+		int hidden_dim1 = 8;
+		int hidden_dim2 = 4; 
+		int hidden_dim3 = 2; 
 
-		int feature_dim = 7;
-		int hidden_dim1 = 6;
-//		int hidden_dim2 = 3; 
-
-		m.add(new Dense(feature_dim, 3, this.getRandom()));
+		m.add(new Dense(feature_dim, hidden_dim1, this.getRandom()));
 		m.add(new ReLU());
 
+		m.add(new Dense(hidden_dim1, hidden_dim2, this.getRandom()));
+		m.add(new ReLU());
+		
+		m.add(new Dense(hidden_dim2, hidden_dim3, this.getRandom()));
+		m.add(new ReLU());
+		
 		// the last layer MUST be a scalar though
-		m.add(new Dense(3, 1));
+		m.add(new Dense(hidden_dim3, 1));
 		m.add(new Identity());
 
 //		m.add(ReLU()); // decide if you want to add an activation
-
 
 		if (loadParams) {
 			try {
@@ -241,161 +232,6 @@ public class QAgent extends Agent {
 	}
 
 	/**
-     * Given the current state and the footman in question calculate the reward received on the last turn.
-     * This is where you will check for things like Did this footman take or give damage? Did this footman die
-     * or kill its enemy. Did this footman start an action on the last turn? 
-     *
-     * Remember that you will need to discount this reward based on the timestep it is received on.
-     *
-     * As part of the reward you will need to calculate if any of the units have taken damage. You can use
-     * the history view to get a list of damages dealt in the previous turn. Use something like the following.
-     *
-     * for(DamageLog damageLogs : historyView.getDamageLogs(lastTurnNumber)) {
-     *     System.out.println("Defending player: " + damageLog.getDefenderController() + " defending unit: " + \
-     *         damageLog.getDefenderID() + " attacking player: " + damageLog.getAttackerController() + \
-     *         "attacking unit: " + damageLog.getAttackerID());
-     * }
-     *
-     * You will do something similar for the deaths. See the middle step documentation for a snippet
-     * showing how to use the deathLogs.
-     *
-     * To see if a command was issued you can check the commands issued log.
-     *
-     * Map<Integer, Action> commandsIssued = historyView.getCommandsIssued(playernum, lastTurnNumber);
-     * for (Map.Entry<Integer, Action> commandEntry : commandsIssued.entrySet()) {
-     *     System.out.println("Unit " + commandEntry.getKey() + " was command to " + commandEntry.getValue().toString);
-     * }
-     *
-     * @param state The current state of the game.
-     * @param history History of the episode up until this turn.
-     * @param unitId The id of the unit you are looking to calculate the reward for.
-     * @return The current reward for that unit
-     */
-	
-	private double getRewardForCompletedTasks(StateView state, HistoryView history, int unitId) {
-		
-		int lastTurnNumber = state.getTurnNumber();
-		int reward = 0;
-		
-		 //Check for failed actions 
-        Map<Integer, ActionResult> actionResults = history.getCommandFeedback(this.getPlayerNumber(), lastTurnNumber);
-        for(ActionResult result : actionResults.values()) {
-        	if (result.getAction().getUnitId() != unitId) {
-        		continue;
-        	}
-        	switch(result.getFeedback()) {
-        	case COMPLETED: 
-        		reward = reward + 300;
-        		TargetedAction action = (TargetedAction) result.getAction();
-        		 
-                 //reward for killing an enemy
-                 if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
-//        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
-                	 reward = reward + 1000;
-                 }
-        	case INCOMPLETE: 
-        		continue;
-        	case FAILED: 
-        		reward = reward - 100;
-        	case INCOMPLETEMAYBESTUCK:
-        		reward = reward - 100;
-        	default: 
-        		continue;
-        	}
-        }
-        
-        return reward;
-	}
-	
-	private double getDamageReward(StateView state, HistoryView history, int unitId) {
-		int lastTurnNumber = state.getTurnNumber()-1;
-    	int damageTaken = 0;
-    	int damageDealt = 0;
-    	// check if footman took damage or did damage
-    	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
-    		if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
-    			damageTaken -= damageLog.getDamage();
-    		}
-    		if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
-    			damageDealt += damageLog.getDamage();
-    		}
-    	}
-    	int reward = damageTaken+damageDealt;
-    	return reward;
-	}
-	
-	// checks if the unit died last turn
-	private double getDeathReward(StateView state, HistoryView history, int unitId) {
-		int lastTurnNumber = state.getTurnNumber()-1;
-		for(DeathLog deathLog : history.getDeathLogs(lastTurnNumber)) {
-//		     System.out.println("Player: " + deathLog.getController() + " unit: " + deathLog.getDeadUnitID());
-			if (deathLog.getDeadUnitID() == unitId) {
-//				System.out.println("\nmonkey time\n");
-				return -100;
-			}
-		}
-		return 100;
-	}
-	
-    private double getRewardForUnit(StateView state, HistoryView history, int unitId)
-    {
-    	/** TODO: complete me! **/
-    	double damageReward = getDamageReward(state, history, unitId);
-    	double taskReward = getRewardForCompletedTasks(state, history, unitId);
-    	double deathReward = 0;
-    	if (state.getTurnNumber() > 0) {
-    		deathReward = getDeathReward(state, history, unitId);
-    	}
-    	double reward = damageReward+taskReward+deathReward;
-    	System.out.println("reward: "+reward);
-    	return reward;
-    }
-
-    /**
-    * Given a state and action calculate your features here. Please include a comment explaining what features
-    * you chose and why you chose them.
-    *
-    * All of your feature functions should evaluate to a double. Collect all of these into a row vector
-    * (a Matrix with 1 row and n columns). This will be the input to your neural network
-    *
-    * It is a good idea to make the first value in your array a constant. This just helps remove any offset
-    * from 0 in the Q-function. The other features are up to you.
-    * 
-    * It might be a good idea to save whatever feature vector you calculate in the oldFeatureVectors field
-    * so that when that action ends (and we observe a transition to a new state), we can update the Q value Q(s,a)
-    *
-    * @param state Current state of the SEPIA game
-    * @param history History of the game up until this turn
-    * @param atkUnitId Your unit. The one doing the attacking.
-    * @param tgtUnitId An enemy unit. The one your unit is considering attacking.
-    * @return The Matrix of feature function outputs.
-    */
-   private Matrix calculateFeatureVector(StateView state, HistoryView history,
-                                        int atkUnitId, int tgtUnitId)
-   {
-	   /** TODO: complete me! **/
-	   return Matrix.zeros(1, 1);
-	   // how many teammates are attacking the targeted unit? (how many teammates have attacked the target)
-	   
-	   
-   }
-   
-    /**
-     * Calculate the Q-Value for a given state action pair. The state in this scenario is the current
-     * state view and the history of this episode. The action is the attacker and the enemy pair for the
-     * SEPIA attack action.
-     *
-     * This returns the Q-value according to your feature approximation. This is where you will pass
-     * your features through your network (and extract the predicted q-value using the .item() method)
-     * @param featureVec The feature vector
-     * @return The approximate Q-value
-     */
-    private double calculateQValue(Matrix featureVec)
-    {
-    	double qValue = 0.0;
-        try
-        {
-
 	 * Given the current state and the footman in question calculate the reward
 	 * received on the last turn. This is where you will check for things like Did
 	 * this footman take or give damage? Did this footman die or kill its enemy. Did
@@ -435,7 +271,7 @@ public class QAgent extends Agent {
 	private double getRewardForCompletedTasks(StateView state, HistoryView history, int unitId) {
 
 		int lastTurnNumber = state.getTurnNumber() - 1;
-		int reward = 0;
+		double reward = 0.0;
 
 		// Check for failed actions
 		Map<Integer, ActionResult> actionResults = history.getCommandFeedback(this.getPlayerNumber(), lastTurnNumber);
@@ -445,18 +281,16 @@ public class QAgent extends Agent {
 			}
 			switch (result.getFeedback()) {
 			case COMPLETED:
+
 				TargetedAction action = (TargetedAction) result.getAction();
 				// reward for killing an enemy
 				if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
 //        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
-					reward = reward + 200;
+					reward = reward + 85000;
 				}
 			case INCOMPLETE:
 				continue;
-			case FAILED:
-				reward = reward - 30;
-			case INCOMPLETEMAYBESTUCK:
-				reward = reward - 30;
+
 			default:
 				continue;
 			}
@@ -489,56 +323,174 @@ public class QAgent extends Agent {
 			}
 		}
 
-		if (tgtUnit == -100) {
+		if (tgtUnit == -100D) {
 			return 0.0;
 		}
 
 		int amtAttacking = attackMap.get(tgtUnit);
 		double totalLeft = (double) this.getMyUnitIds().size();
-		double reward = ((amtAttacking / totalLeft));
-		if (totalLeft == 2) {
-			reward = (amtAttacking / totalLeft) * 0.2;
-		}
-		if (totalLeft == 1) {
+		if (totalLeft == 1D) {
 			return 0.0;
 		}
+		double ratio = amtAttacking / totalLeft;
+		if (totalLeft == 2D && amtAttacking == 2D) {
+			return 0.1;
+		}
+		if (totalLeft == 3D) {
+			if (ratio < 2/3D) {
+				return -(ratio);
+			}
+			else {
+				return ratio;
+			}
+		}
+		if (totalLeft == 4D) {
 
-		return reward*(0.001);
+			if (ratio < 3/4D) {
+				return -(3/4D);
+			}
+			if (ratio == 3/4D) {
+				return -(1/2);
+			} else {
+				return 2;
+			}
+
+		}
+
+		if (totalLeft == 5) {
+
+			if (ratio <= 1.0 / 5D) {
+				return -3.0;
+			}
+
+			if (ratio <= 2.0 / 5D) {
+				return -2.0;
+			}
+
+			if (ratio <= 3.0 / 5D) {
+				return -1.0;
+			}
+
+			if (ratio <= 4.0 / 5D) {
+				return 0.0;
+			}
+
+			if (ratio <= 5.0 / 5D) {
+				return 4.0;
+			}
+
+		}
+
+		return -5.0;
+	}
+	
+	
+	//doesn't work as intended
+	private double getRewardForGrouping(StateView state, int unitId) {
+
+		double distance = selfNearFriends(state, state.getUnit(unitId));
+		if (distance == 0) {
+			return 0;
+		}
+		
+		return (1/distance*distance);
+	}
+
+	private double getRewardForClosestEnemy(StateView state, Unit.UnitView unit) {
+
+		double x1 = (double) unit.getXPosition();
+		double y1 = (double) unit.getYPosition();
+
+		Set<Integer> mySet = this.getEnemyUnitIds();
+		Iterator<Integer> unitIdsIterator = mySet.iterator();
+
+		double closestDistance = Double.MAX_VALUE;
+		while (unitIdsIterator.hasNext()) {
+			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
+			double x2 = (double) currentUnit.getXPosition();
+			double y2 = (double) currentUnit.getYPosition();
+
+			double yAxisResult = (y2 - y1) * (y2 - y1);
+			double xAxisResult = (x2 - x1) * (x2 - x1);
+			closestDistance = Math.min(closestDistance, Math.sqrt(yAxisResult + xAxisResult));
+		}
+
+//	    	System.out.println((1/closestDistance)*0.1);
+		if (closestDistance > 4.0) {
+			return 0;
+		}
+		if (closestDistance > 1.5) {
+			return 0.1;
+		} else {
+			return 1;
+		}
 
 	}
 
+	private double getRewardForOutnumberingEnemy(StateView state) {
+		double amtEnemies = this.getEnemyUnitIds().size();
+		double mine = this.getMyUnitIds().size();
+		if (mine  > amtEnemies) {
+			return 1000;
+		}
+		if (mine == amtEnemies) {
+			return 0;
+		}
+		else {
+			return -100;
+		}
+	}
+	private double getDamageReward(StateView state, HistoryView history, int unitId) {
+		int lastTurnNumber = state.getTurnNumber()-1;
+    	int damageTaken = 0;
+    	int damageDealt = 0;
+    	// check if footman took damage or did damage
+    	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
+    		if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
+    			damageTaken -= damageLog.getDamage();
+    		}
+    		if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
+    			damageDealt += damageLog.getDamage();
+    		}
+    	}
+    	double reward = (damageTaken+damageDealt)*6000D;
+    	return reward;
+	}
+	
+	// checks if the unit died last turn
+	private double getDeathReward(StateView state, HistoryView history, int unitId) {
+		int lastTurnNumber = state.getTurnNumber()-1;
+		for(DeathLog deathLog : history.getDeathLogs(lastTurnNumber)) {
+//		     System.out.println("Player: " + deathLog.getController() + " unit: " + deathLog.getDeadUnitID());
+			if (deathLog.getDeadUnitID() == unitId) {
+//				System.out.println("\nmonkey time\n");
+				return -1000;
+			}
+		}
+		return 1000;
+	}
 	private double getRewardForUnit(StateView state, HistoryView history, int unitId) {
 		/** TODO: complete me! **/
 		int lastTurnNumber = state.getTurnNumber() - 1;
-		double damageTaken = 0.0;
-		double damageDealt = 0.0;
 		double reward = 0;
 
 		if (lastTurnNumber == -1) {
 			return 0.0;
 		}
-
-		// check if footman took damage
-		for (DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
-//	    		System.out.println("Defending player: " + damageLog.getDefenderController() + " defending unit: " + 
-//	    	    damageLog.getDefenderID() + " attacking player: " + damageLog.getAttackerController() + 
-//	    	    "attacking unit: " + damageLog.getAttackerID() + "damage done: "+damageLog.getDamage());
-			if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
-				damageTaken -= damageLog.getDamage();
-			}
-			if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
-				damageDealt += damageLog.getDamage();
-			}
-		}
-
-		reward = (damageDealt) * 20D;
-		reward = damageTaken * 10D;
-
-		reward = reward + getRewardForCompletedTasks(state, history, unitId);
+//		System.out.println(reward);
+		reward = reward + getDamageReward(state, history, unitId);
+		reward = reward + getDeathReward(state, history, unitId);
+		reward = reward + (getRewardForCompletedTasks(state, history, unitId));
 		reward = reward + (getRewardForGangingUp(state, history, unitId));
-
+//		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
+//		reward = reward + (getRewardForClosestEnemy(state, state.getUnit(unitId))*10); doesn't work as intended
+		reward = reward + getRewardForOutnumberingEnemy(state);
 //	        System.out.println(reward);
-		return reward*1000;
+		
+		if (reward < 0) {
+			return -((reward*reward));
+		}
+		return (reward*reward);
 	}
 
 	/**
@@ -629,58 +581,56 @@ public class QAgent extends Agent {
 //    	System.out.println(distance);
 		return distance / 10D;
 	}
-	
-	
+
 	private double friendsNearTarget(StateView state, Unit.UnitView tgtUnit) {
 		double x1 = (double) tgtUnit.getXPosition();
 		double y1 = (double) tgtUnit.getYPosition();
-		
+
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
+
 		int count = 0;
 		double distance = 0;
-		while(unitIdsIterator.hasNext()) {
+		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
-			
+
 			double yAxisResult = (y2 - y1) * (y2 - y1);
 			double xAxisResult = (x2 - x1) * (x2 - x1);
 			distance = distance + Math.sqrt(yAxisResult + xAxisResult);
 		}
-		
+
 //    	System.out.println(distance);
-		
+
 		return distance / count;
 	}
-	
+
 	private double selfNearFriends(StateView state, Unit.UnitView atkUnit) {
 		double x1 = (double) atkUnit.getXPosition();
 		double y1 = (double) atkUnit.getYPosition();
-		
+
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
+
 		int count = 0;
 		double distance = 0;
-		while(unitIdsIterator.hasNext()) {
+		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
-			
+
 			double yAxisResult = (y2 - y1) * (y2 - y1);
 			double xAxisResult = (x2 - x1) * (x2 - x1);
 			distance = distance + Math.sqrt(yAxisResult + xAxisResult);
 		}
-		
+
 //    	System.out.println(distance);
-		
+
 		return distance / count;
 	}
-	
 
 	private Matrix calculateFeatureVector(StateView state, HistoryView history, int atkUnitId, int tgtUnitId) {
 		/** TODO: complete me! **/
@@ -689,13 +639,15 @@ public class QAgent extends Agent {
 		Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 
 		// Create n + 1 columns for offset, as comment above suggests
-		Matrix features = Matrix.zeros(1, 7);
+		Matrix features = Matrix.zeros(1, 9);
 		features.set(0, 1, getHealthDiff(tgtUnit, atkUnit, state));
 		features.set(0, 2, getEnemyHealth(tgtUnit));
 		features.set(0, 3, gangUpFactor(tgtUnitId, atkUnitId, state, history));
 		features.set(0, 4, distanceToTarget(tgtUnit, atkUnit));
 		features.set(0, 5, friendsNearTarget(state, tgtUnit));
 		features.set(0, 6, selfNearFriends(state, atkUnit));
+		features.set(0, 7, this.getEnemyUnitIds().size()/5);
+		features.set(0, 8, this.getMyUnitIds().size()/5);
 
 //	   System.out.println(features);
 		return features;
@@ -905,35 +857,46 @@ public class QAgent extends Agent {
 	public Map<Integer, Action> middleStep(StateView state, HistoryView history) {
 		Map<Integer, Action> actions = new HashMap<Integer, Action>(this.getMyUnitIds().size());
 
-    	// if this isn't the first turn in the game
-    	// get the previous action history in the previous step
-		Map<Integer, ActionResult> prevUnitActions = history.getCommandFeedback(this.playernum, state.getTurnNumber() - 1);
+		// if this isn't the first turn in the game
+		if (state.getTurnNumber() > 0) {
 
-    	for(Integer unitId : this.getMyUnitIds())
-    	{
-    		// decide what each unit should do (i.e. attack)
+			// check death logs and remove dead units
+			// removes all dead units from the set of unitIds
+			for (DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1)) {
+				if (deathLog.getController() == this.getPlayerNumber()) {
+					this.getMyUnitIds().remove(deathLog.getDeadUnitID());
+				} else if (deathLog.getController() == this.getEnemyPlayerId()) {
+					this.getEnemyUnitIds().remove(deathLog.getDeadUnitID());
+				}
+			}
+		}
 
-    		// calculate the reward for this unit
-    		double reward = this.getRewardForUnit(state, history, unitId);
+		// get the previous action history in the previous step
+		Map<Integer, ActionResult> prevUnitActions = history.getCommandFeedback(this.playernum,
+				state.getTurnNumber() - 1);
 
-    		// if we are playing a test episode then add these rewards to the total reward for the test games
-    		if(this.numTestEpisodesPlayedInBatch != -1)
-    		{
-    			this.totalRewards.set(this.totalRewards.size() - 1, 
-    				this.totalRewards.get(this.totalRewards.size() - 1) + Math.pow(this.GAMMA, state.getTurnNumber() - 1) * reward);
-    		}
-    		
-    		//if this unit does not have an action or the action was completed or failed...give a unit an action
-    		if(state.getTurnNumber() == 0 || !prevUnitActions.containsKey(unitId) || 
-    				prevUnitActions.get(unitId).getFeedback().equals(ActionFeedback.COMPLETED) ||
-    				prevUnitActions.get(unitId).getFeedback().equals(ActionFeedback.FAILED))
-    		{
-    			if(state.getTurnNumber() > 0)
-    			{
-    				// we have arrived at a new state for that unit, so time to update some gradients
-    				try
-    				{
+		for (Integer unitId : this.getMyUnitIds()) {
+			// decide what each unit should do (i.e. attack)
 
+			// calculate the reward for this unit
+			double reward = this.getRewardForUnit(state, history, unitId);
+
+			// if we are playing a test episode then add these rewards to the total reward
+			// for the test games
+			if (this.numTestEpisodesPlayedInBatch != -1) {
+				this.totalRewards.set(this.totalRewards.size() - 1, this.totalRewards.get(this.totalRewards.size() - 1)
+						+ Math.pow(this.GAMMA, state.getTurnNumber() - 1) * reward);
+			}
+
+			// if this unit does not have an action or the action was completed or
+			// failed...give a unit an action
+			if (state.getTurnNumber() == 0 || !prevUnitActions.containsKey(unitId)
+					|| prevUnitActions.get(unitId).getFeedback().equals(ActionFeedback.COMPLETED)
+					|| prevUnitActions.get(unitId).getFeedback().equals(ActionFeedback.FAILED)) {
+				if (state.getTurnNumber() > 0) {
+					// we have arrived at a new state for that unit, so time to update some
+					// gradients
+					try {
 						this.updateParams(state, history, unitId);
 					} catch (Exception e) {
 						System.err.println(
@@ -947,28 +910,11 @@ public class QAgent extends Agent {
 				actions.put(unitId, Action.createCompoundAttack(unitId, tgtUnitId));
 			}
 		}
-    	if(actions.size() > 0)
-    	{
-    		this.getStreamer().streamMove(actions);
-    	}
-    	if(state.getTurnNumber() > 0)
-    	{
-    		// check death logs and remove dead units
-    		//removes all dead units from the set of unitIds
-    		for(DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1))
-    		{
-    			if(deathLog.getController() == this.getPlayerNumber())
-    			{
-    				this.getMyUnitIds().remove(deathLog.getDeadUnitID());
-    			}
-    			else if(deathLog.getController() == this.getEnemyPlayerId())
-    			{
-    				this.getEnemyUnitIds().remove(deathLog.getDeadUnitID());
-    			}
-    		}
-    	}
-        return actions;
 
+		if (actions.size() > 0) {
+//			this.getStreamer().streamMove(actions); annoying
+		}
+		return actions;
 	}
 
 	@Override
