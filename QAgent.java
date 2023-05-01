@@ -1,7 +1,15 @@
+/*
+ * Student: Daniel Tse
+ * BUID: U05871766
+ * Student: Ingi Hong
+ * BUID: U35399731
+ */
+
 package hw3;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,12 +22,10 @@ import java.util.Random;
 import java.util.Set;
 
 import edu.bu.hw3.linalg.Matrix;
+import edu.bu.hw3.linalg.MatrixTester;
 import edu.bu.hw3.nn.LossFunction;
 import edu.bu.hw3.nn.Model;
 import edu.bu.hw3.nn.Optimizer;
-import edu.bu.hw3.nn.layers.Dense;
-import edu.bu.hw3.nn.layers.Sigmoid;
-import edu.bu.hw3.nn.layers.Tanh;
 import edu.bu.hw3.nn.losses.MeanSquaredError;
 import edu.bu.hw3.nn.models.Sequential;
 import edu.bu.hw3.nn.optimizers.SGDOptimizer;
@@ -29,7 +35,6 @@ import edu.bu.hw3.utils.Triple;
 import edu.cwru.sepia.action.Action;
 import edu.cwru.sepia.action.ActionFeedback;
 import edu.cwru.sepia.action.ActionResult;
-import edu.cwru.sepia.action.ActionType;
 import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.agent.Agent;
 import edu.cwru.sepia.environment.model.history.DamageLog;
@@ -41,6 +46,7 @@ import edu.cwru.sepia.environment.model.state.State.StateView;
 
 public class QAgent extends Agent
 {
+
 	public static final long serialVersionUID = -5077535504876086643L;
 	public static final int RANDOM_SEED = 12345;
 	public static final double GAMMA = 0.9;
@@ -167,28 +173,10 @@ public class QAgent extends Agent
 	private Model initializeQFunction(boolean loadParams)
 	{
 		Sequential m = new Sequential();
-		
 
 		/**
 		 * TODO: create your model!
 		 */
-		
-		int feature_dim = 3; 
-		int hidden_dim1 = 2;
-		int hidden_dim2 = 2; 
-		
-		m.add(new Dense(feature_dim, hidden_dim1, this.getRandom()));
-		m.add(new Sigmoid()); 
-		
-		m.add(new Dense(hidden_dim1, hidden_dim2, this.getRandom()));
-	    m.add(new Tanh());
-
-	    // the last layer MUST be a scalar though
-		m.add(new Dense(hidden_dim2, 1));
-		m.add(new Tanh());
-//		m.add(ReLU()); // decide if you want to add an activation
-		
-		
 
 		if(loadParams)
 		{
@@ -236,25 +224,83 @@ public class QAgent extends Agent
      * @param unitId The id of the unit you are looking to calculate the reward for.
      * @return The current reward for that unit
      */
-    private double getRewardForUnit(StateView state, HistoryView history, int unitId)
-    {
-    	/** TODO: complete me! **/
-    	int lastTurnNumber = state.getTurnNumber()-1;
+	
+	private double getRewardForCompletedTasks(StateView state, HistoryView history, int unitId) {
+		
+		int lastTurnNumber = state.getTurnNumber();
+		int reward = 0;
+		
+		 //Check for failed actions 
+        Map<Integer, ActionResult> actionResults = history.getCommandFeedback(this.getPlayerNumber(), lastTurnNumber);
+        for(ActionResult result : actionResults.values()) {
+        	if (result.getAction().getUnitId() != unitId) {
+        		continue;
+        	}
+        	switch(result.getFeedback()) {
+        	case COMPLETED: 
+        		reward = reward + 300;
+        		TargetedAction action = (TargetedAction) result.getAction();
+        		 
+                 //reward for killing an enemy
+                 if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
+//        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
+                	 reward = reward + 1000;
+                 }
+        	case INCOMPLETE: 
+        		continue;
+        	case FAILED: 
+        		reward = reward - 100;
+        	case INCOMPLETEMAYBESTUCK:
+        		reward = reward - 100;
+        	default: 
+        		continue;
+        	}
+        }
+        
+        return reward;
+	}
+	
+	private double getDamageReward(StateView state, HistoryView history, int unitId) {
+		int lastTurnNumber = state.getTurnNumber()-1;
     	int damageTaken = 0;
     	int damageDealt = 0;
-    	// check if footman took damage
+    	// check if footman took damage or did damage
     	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
-//    		System.out.println("Defending player: " + damageLog.getDefenderController() + " defending unit: " + 
-//    	    damageLog.getDefenderID() + " attacking player: " + damageLog.getAttackerController() + 
-//    	    "attacking unit: " + damageLog.getAttackerID() + "damage done: "+damageLog.getDamage());
-    		if (damageLog.getDefenderController() == 0 && damageLog.getDefenderID() == unitId) {
+    		if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
     			damageTaken -= damageLog.getDamage();
     		}
-    		if (damageLog.getAttackerController() == 0 && damageLog.getAttackerID() == unitId) {
+    		if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
     			damageDealt += damageLog.getDamage();
     		}
     	}
     	int reward = damageTaken+damageDealt;
+    	return reward;
+	}
+	
+	// checks if the unit died last turn
+	private double getDeathReward(StateView state, HistoryView history, int unitId) {
+		int lastTurnNumber = state.getTurnNumber()-1;
+		for(DeathLog deathLog : history.getDeathLogs(lastTurnNumber)) {
+//		     System.out.println("Player: " + deathLog.getController() + " unit: " + deathLog.getDeadUnitID());
+			if (deathLog.getDeadUnitID() == unitId) {
+//				System.out.println("\nmonkey time\n");
+				return -100;
+			}
+		}
+		return 100;
+	}
+	
+    private double getRewardForUnit(StateView state, HistoryView history, int unitId)
+    {
+    	/** TODO: complete me! **/
+    	double damageReward = getDamageReward(state, history, unitId);
+    	double taskReward = getRewardForCompletedTasks(state, history, unitId);
+    	double deathReward = 0;
+    	if (state.getTurnNumber() > 0) {
+    		deathReward = getDeathReward(state, history, unitId);
+    	}
+    	double reward = damageReward+taskReward+deathReward;
+    	System.out.println("reward: "+reward);
     	return reward;
     }
 
@@ -277,75 +323,14 @@ public class QAgent extends Agent
     * @param tgtUnitId An enemy unit. The one your unit is considering attacking.
     * @return The Matrix of feature function outputs.
     */
-    
-    //Health Difference
-    //Chose it because I'd want my units to avoid attacking units healthier than them. 
-    //Hopefully nn agrees. 
-    private double getHealthDiff(Unit.UnitView tgtUnit, Unit.UnitView atkUnit, StateView state) {
-    	
-    	double tgtUnitHealth = tgtUnit.getHP();
-    	double atkUnitHealth = atkUnit.getHP();
-    	
-    	double difference = atkUnitHealth - tgtUnitHealth;
-    	
-    	
-    	double normalizedDiff = difference/100D;
-    	
-    	return normalizedDiff;	
-    }
-    
-    //Enemy Health 
-    //Chose it because hopefully the nn starts to target lower health units (finish them off faster so they have no damage potential).
-    private double getEnemyHealth(Unit.UnitView tgtUnit) {
-    	
-    	
-    	double normalizedHealth = tgtUnit.getHP()/100D;
-    	return normalizedHealth;
-    }
-    
-    //More people attacking one enemy kills the enemy quicker. Good info for the nn to have. 
-    private double gangUpFactor(int tgtUnitId, int atkUnitId, StateView state, HistoryView history) {
-    	
-    	  Map<Integer, Action> actions = history.getCommandsIssued(this.getPlayerNumber(), state.getTurnNumber() - 1);
-    	  
-    	  double amtAttackers = 0.0;
-          for(Action action : actions.values()) {
-              TargetedAction targetAction = (TargetedAction) action;
-              if (targetAction.getTargetId() == tgtUnitId) {
-            	  
-            	amtAttackers++;  
-              }
-         }
-          
-          Map<Integer, ActionResult> feedback = history.getCommandFeedback(this.getPlayerNumber(), state.getTurnNumber() - 1);
-          
-          for(ActionResult actionResult : feedback.values()) {
-        	  TargetedAction targetAction = (TargetedAction) actionResult.getAction();
-              if (targetAction.getTargetId() == tgtUnitId) {
-            	amtAttackers++;  
-              }
-         }
-          
-          return amtAttackers/5;
-    	
-    }
-    
    private Matrix calculateFeatureVector(StateView state, HistoryView history,
                                         int atkUnitId, int tgtUnitId)
    {
 	   /** TODO: complete me! **/
+	   return Matrix.zeros(1, 1);
+	   // how many teammates are attacking the targeted unit? (how many teammates have attacked the target)
 	   
-	   Unit.UnitView tgtUnit = state.getUnit(tgtUnitId);
-   	   Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 	   
-	   Matrix features = Matrix.zeros(1, 3);
-	   	   
-	   features.set(0, 0, getHealthDiff(tgtUnit, atkUnit, state));
-	   features.set(0, 1, getEnemyHealth(tgtUnit));
-	   features.set(0, 2, gangUpFactor(tgtUnitId, atkUnitId, state, history));
-	   
-	   System.out.println(features);
-	   return features;
    }
    
     /**
@@ -551,26 +536,7 @@ public class QAgent extends Agent
 	public Map<Integer, Action> middleStep(StateView state, HistoryView history)
 	{
 		Map<Integer, Action> actions = new HashMap<Integer, Action>(this.getMyUnitIds().size());
-
     	// if this isn't the first turn in the game
-    	if(state.getTurnNumber() > 0)
-    	{
-
-    		// check death logs and remove dead units
-    		//removes all dead units from the set of unitIds
-    		for(DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1))
-    		{
-    			if(deathLog.getController() == this.getPlayerNumber())
-    			{
-    				this.getMyUnitIds().remove(deathLog.getDeadUnitID());
-    			}
-    			else if(deathLog.getController() == this.getEnemyPlayerId())
-    			{
-    				this.getEnemyUnitIds().remove(deathLog.getDeadUnitID());
-    			}
-    		}
-    	}
-
     	// get the previous action history in the previous step
 		Map<Integer, ActionResult> prevUnitActions = history.getCommandFeedback(this.playernum, state.getTurnNumber() - 1);
 
@@ -614,6 +580,22 @@ public class QAgent extends Agent
     	if(actions.size() > 0)
     	{
     		this.getStreamer().streamMove(actions);
+    	}
+    	if(state.getTurnNumber() > 0)
+    	{
+    		// check death logs and remove dead units
+    		//removes all dead units from the set of unitIds
+    		for(DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1))
+    		{
+    			if(deathLog.getController() == this.getPlayerNumber())
+    			{
+    				this.getMyUnitIds().remove(deathLog.getDeadUnitID());
+    			}
+    			else if(deathLog.getController() == this.getEnemyPlayerId())
+    			{
+    				this.getEnemyUnitIds().remove(deathLog.getDeadUnitID());
+    			}
+    		}
     	}
         return actions;
 	}
