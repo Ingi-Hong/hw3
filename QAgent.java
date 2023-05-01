@@ -277,7 +277,7 @@ public class QAgent extends Agent {
 			}
 			switch (result.getFeedback()) {
 			case COMPLETED:
-
+				reward = reward + 0.00000000005;
 				TargetedAction action = (TargetedAction) result.getAction();
 				// reward for killing an enemy
 				if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
@@ -286,14 +286,9 @@ public class QAgent extends Agent {
 				}
 			case INCOMPLETE:
 				continue;
-			case FAILED:
-//				reward = reward - 0.00000000000001;
-				continue;
-			case INCOMPLETEMAYBESTUCK:
-//				reward = reward - 0.00000000000001;
-				continue;
+
 			default:
-				continue;
+				reward = reward - 0.00000000001;
 			}
 		}
 
@@ -332,24 +327,68 @@ public class QAgent extends Agent {
 		double totalLeft = (double) this.getMyUnitIds().size();
 		
 		if (totalLeft == 1) {
-			return -0.000000000001;
+			return -0.00001;
 		}
+		
+		double ratio = amtAttacking/totalLeft;
 		
 		if (totalLeft == 2 && amtAttacking == 2) {
 			return 0.5;
 		}
 		
-		if (totalLeft == 2 && amtAttacking == 1) {
-			return -5;
+		if (ratio <= 1.0/totalLeft) {
+			return -100;
 		}
 		
-		double ratio = amtAttacking/totalLeft;
-		
-		if (ratio > 0.9) {
-			return 3;
+		if (ratio <= 2.0/totalLeft) {
+			return -50;
 		}
 		
+		if(ratio<=3.0/totalLeft) {
+			return -15; 
+		}
+		
+		if(ratio<=4.0/totalLeft) {
+			return -1;
+		}
+		
+		if(ratio<=5.0/totalLeft) {
+			return 0.5;
+		}
 		return -5;
+	}
+	
+	private double getRewardForGrouping(StateView state, int unitId) {
+		
+		double distance = selfNearFriends(state, state.getUnit(unitId));
+		
+		if(distance==0) {
+			return 0;
+		}
+		
+		if (distance >= 6) {
+			return -4;
+		}
+		
+		if (distance >= 5) {
+			return -2;
+		}
+		
+		if (distance >= 4) {
+			return -1;
+		}
+		
+		if (distance >= 3) {
+			return 0;
+		}
+		
+		if (distance >= 2) {
+			return 0.1;
+		}
+		
+		else {
+			return 0;
+		}
 	}
 
 	private double getRewardForUnit(StateView state, HistoryView history, int unitId) {
@@ -376,13 +415,13 @@ public class QAgent extends Agent {
 			}
 		}
 
-		reward = (damageDealt-damageTaken)*0.1;
+		reward = ((damageDealt*50D)-(damageTaken*50D));
 		
 //		System.out.println(reward);
 		
 		reward = reward + getRewardForCompletedTasks(state, history, unitId);
 		reward = reward + (getRewardForGangingUp(state, history, unitId));
-
+		reward = reward + (getRewardForGrouping(state, unitId));
 //	        System.out.println(reward);
 		return reward;
 	}
