@@ -278,7 +278,7 @@ public class QAgent extends Agent {
 				// reward for killing an enemy
 				if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
 //        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
-					reward = reward + 90;
+					reward = reward + 200;
 				}
 			case INCOMPLETE:
 				continue;
@@ -332,7 +332,7 @@ public class QAgent extends Agent {
 			return 0.0;
 		}
 
-		return reward*(0.01);
+		return reward*(0.001);
 
 	}
 
