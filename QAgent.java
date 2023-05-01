@@ -205,9 +205,12 @@ public class QAgent extends Agent {
 
 		m.add(new Dense(feature_dim, 3, this.getRandom()));
 		m.add(new ReLU());
+		
+		m.add(new Dense(3, 2, this.getRandom()));
+		m.add(new ReLU());
 
 		// the last layer MUST be a scalar though
-		m.add(new Dense(3, 1));
+		m.add(new Dense(2, 1));
 		m.add(new Identity());
 
 //		m.add(ReLU()); // decide if you want to add an activation
@@ -264,7 +267,7 @@ public class QAgent extends Agent {
 	private double getRewardForCompletedTasks(StateView state, HistoryView history, int unitId) {
 
 		int lastTurnNumber = state.getTurnNumber() - 1;
-		int reward = 0;
+		double reward = 0.0;
 
 		// Check for failed actions
 		Map<Integer, ActionResult> actionResults = history.getCommandFeedback(this.getPlayerNumber(), lastTurnNumber);
@@ -274,18 +277,21 @@ public class QAgent extends Agent {
 			}
 			switch (result.getFeedback()) {
 			case COMPLETED:
+
 				TargetedAction action = (TargetedAction) result.getAction();
 				// reward for killing an enemy
 				if (!(this.getEnemyUnitIds().contains(action.getTargetId()))) {
 //        			System.out.println("\n\n\n \n\n\n\n\nSTRAIGHT KILLER\n\n\n\n\n");
-					reward = reward + 200;
+					reward = reward + 5;
 				}
 			case INCOMPLETE:
 				continue;
 			case FAILED:
-				reward = reward - 30;
+//				reward = reward - 0.00000000000001;
+				continue;
 			case INCOMPLETEMAYBESTUCK:
-				reward = reward - 30;
+//				reward = reward - 0.00000000000001;
+				continue;
 			default:
 				continue;
 			}
@@ -324,16 +330,26 @@ public class QAgent extends Agent {
 
 		int amtAttacking = attackMap.get(tgtUnit);
 		double totalLeft = (double) this.getMyUnitIds().size();
-		double reward = ((amtAttacking / totalLeft));
-		if (totalLeft == 2) {
-			reward = (amtAttacking / totalLeft) * 0.2;
-		}
+		
 		if (totalLeft == 1) {
-			return 0.0;
+			return -0.000000000001;
 		}
-
-		return reward*(0.001);
-
+		
+		if (totalLeft == 2 && amtAttacking == 2) {
+			return 0.5;
+		}
+		
+		if (totalLeft == 2 && amtAttacking == 1) {
+			return -5;
+		}
+		
+		double ratio = amtAttacking/totalLeft;
+		
+		if (ratio > 0.9) {
+			return 3;
+		}
+		
+		return -5;
 	}
 
 	private double getRewardForUnit(StateView state, HistoryView history, int unitId) {
@@ -360,14 +376,15 @@ public class QAgent extends Agent {
 			}
 		}
 
-		reward = (damageDealt) * 20D;
-		reward = damageTaken * 10D;
-
+		reward = (damageDealt-damageTaken)*0.1;
+		
+//		System.out.println(reward);
+		
 		reward = reward + getRewardForCompletedTasks(state, history, unitId);
 		reward = reward + (getRewardForGangingUp(state, history, unitId));
 
 //	        System.out.println(reward);
-		return reward*1000;
+		return reward;
 	}
 
 	/**
