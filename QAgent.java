@@ -522,7 +522,7 @@ public class QAgent extends Agent {
 
 		double tgtUnitHealth = tgtUnit.getHP();
 		double atkUnitHealth = atkUnit.getHP();
-
+		
 		double difference = atkUnitHealth - tgtUnitHealth;
 		double normalizedDiff = difference / 120D;
 
@@ -581,17 +581,22 @@ public class QAgent extends Agent {
 	}
 
 	private double friendsNearTarget(StateView state, Unit.UnitView tgtUnit) {
+		
 		double x1 = (double) tgtUnit.getXPosition();
 		double y1 = (double) tgtUnit.getYPosition();
+		
 
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-
+		
 		int count = 0;
 		double distance = 0;
 		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
+			if (currentUnit == null) {
+				continue;
+			}
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
 
@@ -611,12 +616,17 @@ public class QAgent extends Agent {
 
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
+		
+		
 
 		int count = 0;
 		double distance = 0;
 		while (unitIdsIterator.hasNext()) {
 			count++;
 			Unit.UnitView currentUnit = state.getUnit(unitIdsIterator.next());
+			if (currentUnit == null) {
+				continue;
+			}
 			double x2 = (double) currentUnit.getXPosition();
 			double y2 = (double) currentUnit.getYPosition();
 
@@ -635,6 +645,13 @@ public class QAgent extends Agent {
 
 		Unit.UnitView tgtUnit = state.getUnit(tgtUnitId);
 		Unit.UnitView atkUnit = state.getUnit(atkUnitId);
+		
+		
+		if (tgtUnit == null || atkUnit == null) {
+//			System.out.println("nulls");
+			return Matrix.zeros(1, 9);
+		}
+		
 
 		// Create n + 1 columns for offset, as comment above suggests
 		Matrix features = Matrix.zeros(1, 9);
