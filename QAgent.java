@@ -46,14 +46,14 @@ public class QAgent extends Agent {
 	public static final long serialVersionUID = -5077535504876086643L;
 	public static final int RANDOM_SEED = 12345;
 	public static final double GAMMA = 0.9;
-	public static final double LEARNING_RATE = 0.0001;
+	public static final double LEARNING_RATE = 0.00001;
 	public static final double EPSILON = 0.02; // prob of ignoring the policy and choosing a random action
 
 	// our agent will play this many training episodes in a row before testing
-	public static final int NUM_TRAINING_EPISODES_IN_BATCH = 10;
+	public static final int NUM_TRAINING_EPISODES_IN_BATCH = 20;
 
 	// our agent will play this many testing episodes in a row before training again
-	public static final int NUM_TESTING_EPISODES_IN_BATCH = 5;
+	public static final int NUM_TESTING_EPISODES_IN_BATCH = 10;
 
 	private final String paramFilePath;
 
@@ -442,8 +442,8 @@ public class QAgent extends Agent {
 	}
 	private double getDamageReward(StateView state, HistoryView history, int unitId) {
 		int lastTurnNumber = state.getTurnNumber()-1;
-    	int damageTaken = 0;
-    	int damageDealt = 0;
+    	double damageTaken = 0;
+    	double damageDealt = 0;
     	// check if footman took damage or did damage
     	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
     		if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
@@ -453,22 +453,20 @@ public class QAgent extends Agent {
     			damageDealt += damageLog.getDamage();
     		}
     	}
-    	double reward = (damageTaken+damageDealt)*6000D;
+    	double reward = (damageTaken+damageDealt)*6000;
     	return reward;
 	}
 	
 	// checks if the unit died last turn
 	private double getDeathReward(StateView state, HistoryView history, int unitId) {
-		int lastTurnNumber = state.getTurnNumber()-1;
-		for(DeathLog deathLog : history.getDeathLogs(lastTurnNumber)) {
-//		     System.out.println("Player: " + deathLog.getController() + " unit: " + deathLog.getDeadUnitID());
-			if (deathLog.getDeadUnitID() == unitId) {
-//				System.out.println("\nmonkey time\n");
-				return -1000;
-			}
+		if (state.getUnit(unitId) == null) {
+			return -1000;
 		}
 		return 1000;
 	}
+	
+	
+	
 	private double getRewardForUnit(StateView state, HistoryView history, int unitId) {
 		/** TODO: complete me! **/
 		int lastTurnNumber = state.getTurnNumber() - 1;
@@ -479,7 +477,7 @@ public class QAgent extends Agent {
 		}
 //		System.out.println(reward);
 		reward = reward + getDamageReward(state, history, unitId);
-		reward = reward + getDeathReward(state, history, unitId);
+//		reward = reward + getDeathReward(state, history, unitId);
 		reward = reward + (getRewardForCompletedTasks(state, history, unitId));
 		reward = reward + (getRewardForGangingUp(state, history, unitId));
 //		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
@@ -699,7 +697,7 @@ public class QAgent extends Agent {
 
 		// epsilon-greedy (i.e. random exploration function)
 		// added && this.isTrainingEpisode()
-		if (this.getRandom().nextDouble() < QAgent.EPSILON) {
+		if(this.getRandom().nextDouble() < QAgent.EPSILON && this.isTrainingEpisode()) {
 			// ignore policy and choose a random action (i.e. attacking which enemy)
 			int randomEnemyIdx = this.getRandom().nextInt(this.getEnemyUnitIds().size());
 
@@ -746,10 +744,14 @@ public class QAgent extends Agent {
 		Double Rs = oldInfo.getThird();
 
 		double maxQ = Double.NEGATIVE_INFINITY;
-
-		// try all the actions (i.e. who to attack) in the current state
-		for (Integer tgtUnitId : this.getEnemyUnitIds()) {
-			maxQ = Math.max(maxQ, this.calculateQValue(this.calculateFeatureVector(state, history, unitId, tgtUnitId)));
+		if (state.getUnit(unitId) != null) {
+			// try all the actions (i.e. who to attack) in the current state
+			for (Integer tgtUnitId : this.getEnemyUnitIds()) {
+				maxQ = Math.max(maxQ,this.calculateQValue(this.calculateFeatureVector(state, history, unitId, tgtUnitId)));
+			}
+		}
+		else {
+			maxQ = 0.0;
 		}
 
 		return Matrix.full(1, 1, Rs + QAgent.GAMMA * maxQ); // output is always a scalar in active learning
@@ -863,9 +865,7 @@ public class QAgent extends Agent {
 			// check death logs and remove dead units
 			// removes all dead units from the set of unitIds
 			for (DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1)) {
-				if (deathLog.getController() == this.getPlayerNumber()) {
-					this.getMyUnitIds().remove(deathLog.getDeadUnitID());
-				} else if (deathLog.getController() == this.getEnemyPlayerId()) {
+				if (deathLog.getController() == this.getEnemyPlayerId()) {
 					this.getEnemyUnitIds().remove(deathLog.getDeadUnitID());
 				}
 			}
@@ -910,7 +910,17 @@ public class QAgent extends Agent {
 				actions.put(unitId, Action.createCompoundAttack(unitId, tgtUnitId));
 			}
 		}
+		// if this isn't the first turn in the game
+		if (state.getTurnNumber() > 0) {
 
+			// check death logs and remove dead units
+			// removes all dead units from the set of unitIds
+			for (DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1)) {
+				if (deathLog.getController() == this.getPlayerNumber()) {
+					this.getMyUnitIds().remove(deathLog.getDeadUnitID());
+				}
+			}
+		}
 		if (actions.size() > 0) {
 //			this.getStreamer().streamMove(actions); annoying
 		}
