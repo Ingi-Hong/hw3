@@ -465,16 +465,19 @@ public class QAgent extends Agent {
 			}
 		}
 
-		double damageRatio = (damageDealt - damageTaken)*600D;
+		double damageRatio = (damageDealt + damageTaken)*100D;
 		reward = reward + damageRatio;
 
 //		System.out.println(reward);
 
-		reward = reward + (getRewardForCompletedTasks(state, history, unitId));
-		reward = reward + (getRewardForGangingUp(state, history, unitId));
+		reward = reward + (getRewardForCompletedTasks(state, history, unitId)*0.3);
+		reward = reward + (getRewardForGangingUp(state, history, unitId)*0.1);
+		reward = reward + getRewardForOutnumberingEnemy(state)*10;
+		
+		
 //		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
 //		reward = reward + (getRewardForClosestEnemy(state, state.getUnit(unitId))*10); doesn't work as intended
-		reward = reward + getRewardForOutnumberingEnemy(state);
+		
 //	        System.out.println(reward);
 		
 		if (reward < 0) {
