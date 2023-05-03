@@ -201,8 +201,8 @@ public class QAgent extends Agent {
 
 		int feature_dim = 9;
 		int hidden_dim1 = 8;
-		int hidden_dim2 = 4; 
-		int hidden_dim3 = 2; 
+		int hidden_dim2 = 4;
+		int hidden_dim3 = 2;
 
 		m.add(new Dense(feature_dim, hidden_dim1, this.getRandom()));
 		m.add(new ReLU());
@@ -212,7 +212,8 @@ public class QAgent extends Agent {
 		
 		m.add(new Dense(hidden_dim2, hidden_dim3, this.getRandom()));
 		m.add(new ReLU());
-		
+
+
 		// the last layer MUST be a scalar though
 		m.add(new Dense(hidden_dim3, 1));
 		m.add(new Identity());
@@ -268,6 +269,8 @@ public class QAgent extends Agent {
 	 * @return The current reward for that unit
 	 */
 
+	// rewards our unit if they just killed someone. Used to reward for completed
+	// tasks and punish for stuck tasks but I didn't notice any good coming from it.
 	private double getRewardForCompletedTasks(StateView state, HistoryView history, int unitId) {
 
 		int lastTurnNumber = state.getTurnNumber() - 1;
@@ -299,6 +302,7 @@ public class QAgent extends Agent {
 		return reward;
 	}
 
+	// Rewards unit if they're attacking a commonly attacked enemy unit.
 	private double getRewardForGangingUp(StateView state, HistoryView history, int unitId) {
 
 		int lastTurnNumber = state.getTurnNumber() - 1;
@@ -337,20 +341,19 @@ public class QAgent extends Agent {
 			return 0.1;
 		}
 		if (totalLeft == 3D) {
-			if (ratio < 2/3D) {
+			if (ratio < 2 / 3D) {
 				return -(ratio);
-			}
-			else {
+			} else {
 				return ratio;
 			}
 		}
 		if (totalLeft == 4D) {
 
-			if (ratio < 3/4D) {
-				return -(3/4D);
+			if (ratio < 3 / 4D) {
+				return -(3 / 4D);
 			}
-			if (ratio == 3/4D) {
-				return -(1/2);
+			if (ratio == 3 / 4D) {
+				return -(1 / 2);
 			} else {
 				return 2;
 			}
@@ -383,19 +386,23 @@ public class QAgent extends Agent {
 
 		return -5.0;
 	}
-	
-	
-	//doesn't work as intended
+
+	// doesn't work as intended
+	// Try to reward our units for sticking close to each other, but I noticed it
+	// tended to just be a constant.
 	private double getRewardForGrouping(StateView state, int unitId) {
 
 		double distance = selfNearFriends(state, state.getUnit(unitId));
 		if (distance == 0) {
 			return 0;
 		}
-		
-		return (1/distance*distance);
+
+		return (1 / distance * distance);
 	}
 
+	// Doesn't work as intended
+	// Original intention was to reward for being close to the enemy but ended up
+	// just being a constant number throughout the variations.
 	private double getRewardForClosestEnemy(StateView state, Unit.UnitView unit) {
 
 		double x1 = (double) unit.getXPosition();
@@ -427,46 +434,46 @@ public class QAgent extends Agent {
 
 	}
 
+	// reward our unit for beating the enemy by a lot!
 	private double getRewardForOutnumberingEnemy(StateView state) {
 		double amtEnemies = this.getEnemyUnitIds().size();
 		double mine = this.getMyUnitIds().size();
-		if (mine  > amtEnemies) {
+		if (mine > amtEnemies) {
 			return 1000;
 		}
 		if (mine == amtEnemies) {
 			return 0;
-		}
-		else {
+		} else {
 			return -100;
 		}
 	}
+
+	// reward our unit for dealing more damage than was dealt.
 	private double getDamageReward(StateView state, HistoryView history, int unitId) {
-		int lastTurnNumber = state.getTurnNumber()-1;
-    	double damageTaken = 0;
-    	double damageDealt = 0;
-    	// check if footman took damage or did damage
-    	for(DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
-    		if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
-    			damageTaken -= damageLog.getDamage();
-    		}
-    		if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
-    			damageDealt += damageLog.getDamage();
-    		}
-    	}
-    	double reward = (damageTaken+damageDealt)*6000;
-    	return reward;
+		int lastTurnNumber = state.getTurnNumber() - 1;
+		double damageTaken = 0;
+		double damageDealt = 0;
+		// check if footman took damage or did damage
+		for (DamageLog damageLog : history.getDamageLogs(lastTurnNumber)) {
+			if (damageLog.getDefenderController() == this.getPlayerNumber() && damageLog.getDefenderID() == unitId) {
+				damageTaken -= damageLog.getDamage();
+			}
+			if (damageLog.getAttackerController() == this.getPlayerNumber() && damageLog.getAttackerID() == unitId) {
+				damageDealt += damageLog.getDamage();
+			}
+		}
+		double reward = (damageTaken + damageDealt) * 6000;
+		return reward;
 	}
-	
+
 	// checks if the unit died last turn
 	private double getDeathReward(StateView state, HistoryView history, int unitId) {
 		if (state.getUnit(unitId) == null) {
 			return -1000;
 		}
-		return 1000;
+		return 10;
 	}
-	
-	
-	
+
 	private double getRewardForUnit(StateView state, HistoryView history, int unitId) {
 		/** TODO: complete me! **/
 		int lastTurnNumber = state.getTurnNumber() - 1;
@@ -475,20 +482,21 @@ public class QAgent extends Agent {
 		if (lastTurnNumber == -1) {
 			return 0.0;
 		}
+
 //		System.out.println(reward);
 		reward = reward + getDamageReward(state, history, unitId);
-//		reward = reward + getDeathReward(state, history, unitId);
+		reward = reward + getDeathReward(state, history, unitId);
 		reward = reward + (getRewardForCompletedTasks(state, history, unitId));
 		reward = reward + (getRewardForGangingUp(state, history, unitId));
 //		reward = reward + getRewardForGrouping(state, unitId); doesn't work as intended
 //		reward = reward + (getRewardForClosestEnemy(state, state.getUnit(unitId))*10); doesn't work as intended
 		reward = reward + getRewardForOutnumberingEnemy(state);
 //	        System.out.println(reward);
-		
+
 		if (reward < 0) {
-			return -((reward*reward));
+			return -((reward * reward));
 		}
-		return (reward*reward);
+		return (reward * reward);
 	}
 
 	/**
@@ -522,7 +530,7 @@ public class QAgent extends Agent {
 
 		double tgtUnitHealth = tgtUnit.getHP();
 		double atkUnitHealth = atkUnit.getHP();
-		
+
 		double difference = atkUnitHealth - tgtUnitHealth;
 		double normalizedDiff = difference / 120D;
 
@@ -580,15 +588,16 @@ public class QAgent extends Agent {
 		return distance / 10D;
 	}
 
+	// Check how many allies our near our target. Good info because hopefully the nn
+	// assigns targets that are surrounded by allies.
 	private double friendsNearTarget(StateView state, Unit.UnitView tgtUnit) {
-		
+
 		double x1 = (double) tgtUnit.getXPosition();
 		double y1 = (double) tgtUnit.getYPosition();
-		
 
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
+
 		int count = 0;
 		double distance = 0;
 		while (unitIdsIterator.hasNext()) {
@@ -610,14 +619,13 @@ public class QAgent extends Agent {
 		return distance / count;
 	}
 
+	// Checks average distance to ally units. Good to stick close to friends.
 	private double selfNearFriends(StateView state, Unit.UnitView atkUnit) {
 		double x1 = (double) atkUnit.getXPosition();
 		double y1 = (double) atkUnit.getYPosition();
 
 		Set<Integer> mySet = this.getMyUnitIds();
 		Iterator<Integer> unitIdsIterator = mySet.iterator();
-		
-		
 
 		int count = 0;
 		double distance = 0;
@@ -646,12 +654,9 @@ public class QAgent extends Agent {
 		Unit.UnitView tgtUnit = state.getUnit(tgtUnitId);
 		Unit.UnitView atkUnit = state.getUnit(atkUnitId);
 		
-		
-		if (tgtUnit == null || atkUnit == null) {
-//			System.out.println("nulls");
-			return Matrix.zeros(1, 9);
+		if ((atkUnit) == null) {
+			return  Matrix.zeros(1, 9);
 		}
-		
 
 		// Create n + 1 columns for offset, as comment above suggests
 		Matrix features = Matrix.zeros(1, 9);
@@ -661,8 +666,8 @@ public class QAgent extends Agent {
 		features.set(0, 4, distanceToTarget(tgtUnit, atkUnit));
 		features.set(0, 5, friendsNearTarget(state, tgtUnit));
 		features.set(0, 6, selfNearFriends(state, atkUnit));
-		features.set(0, 7, this.getEnemyUnitIds().size()/5);
-		features.set(0, 8, this.getMyUnitIds().size()/5);
+		features.set(0, 7, this.getEnemyUnitIds().size() / 5);
+		features.set(0, 8, this.getMyUnitIds().size() / 5);
 
 //	   System.out.println(features);
 		return features;
@@ -714,18 +719,21 @@ public class QAgent extends Agent {
 
 		// epsilon-greedy (i.e. random exploration function)
 		// added && this.isTrainingEpisode()
-		if(this.getRandom().nextDouble() < QAgent.EPSILON && this.isTrainingEpisode()) {
+		if (this.getRandom().nextDouble() < QAgent.EPSILON && this.isTrainingEpisode()) {
 			// ignore policy and choose a random action (i.e. attacking which enemy)
 			int randomEnemyIdx = this.getRandom().nextInt(this.getEnemyUnitIds().size());
 
 			// get the unitId at that position
 			tgtUnitId = this.getEnemyUnitIds().toArray(new Integer[this.getEnemyUnitIds().size()])[randomEnemyIdx];
+
 			featureVec = this.calculateFeatureVector(state, history, atkUnitId, tgtUnitId);
+
 			maxQ = this.calculateQValue(featureVec);
 		} else {
 			// find the action (i.e. attacking which enemy) that maximizes the Q-value
 			for (Integer enemyUnitId : this.getEnemyUnitIds()) {
 				Matrix features = this.calculateFeatureVector(state, history, atkUnitId, enemyUnitId);
+
 				double qValue = this.calculateQValue(features);
 
 				if (qValue > maxQ) {
@@ -761,15 +769,15 @@ public class QAgent extends Agent {
 		Double Rs = oldInfo.getThird();
 
 		double maxQ = Double.NEGATIVE_INFINITY;
-		if (state.getUnit(unitId) != null) {
-			// try all the actions (i.e. who to attack) in the current state
-			for (Integer tgtUnitId : this.getEnemyUnitIds()) {
-				maxQ = Math.max(maxQ,this.calculateQValue(this.calculateFeatureVector(state, history, unitId, tgtUnitId)));
-			}
+//		if (state.getUnit(unitId) != null) {
+		// try all the actions (i.e. who to attack) in the current state
+		for (Integer tgtUnitId : this.getEnemyUnitIds()) {
+			maxQ = Math.max(maxQ, this.calculateQValue(this.calculateFeatureVector(state, history, unitId, tgtUnitId)));
+
 		}
-		else {
-			maxQ = 0.0;
-		}
+//		} else {
+//			maxQ = 0.0;
+//		}
 
 		return Matrix.full(1, 1, Rs + QAgent.GAMMA * maxQ); // output is always a scalar in active learning
 	}
@@ -878,7 +886,6 @@ public class QAgent extends Agent {
 
 		// if this isn't the first turn in the game
 		if (state.getTurnNumber() > 0) {
-
 			// check death logs and remove dead units
 			// removes all dead units from the set of unitIds
 			for (DeathLog deathLog : history.getDeathLogs(state.getTurnNumber() - 1)) {
@@ -923,8 +930,11 @@ public class QAgent extends Agent {
 						System.exit(-1);
 					}
 				}
-				int tgtUnitId = this.selectAction(state, history, unitId);
-				actions.put(unitId, Action.createCompoundAttack(unitId, tgtUnitId));
+
+				if (state.getUnit(unitId) != null) {
+					int tgtUnitId = this.selectAction(state, history, unitId);
+					actions.put(unitId, Action.createCompoundAttack(unitId, tgtUnitId));
+				}
 			}
 		}
 		// if this isn't the first turn in the game
